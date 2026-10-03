@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>URL Groups</title>
+<style>
+:root{--bg:#f6f6f3;--fg:#1d1d1b;--card:#fff;--line:#ddd;--accent:#2f6fed;--muted:#777;--danger:#c0392b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171716;--fg:#eee;--card:#222221;--line:#3a3a38;--accent:#6c9bff;--muted:#999;--danger:#ff7a6b}}
+:root[data-theme="dark"]{--bg:#171716;--fg:#eee;--card:#222221;--line:#3a3a38;--accent:#6c9bff;--muted:#999;--danger:#ff7a6b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;line-height:1.5}
+.wrap{max-width:860px;margin:0 auto;padding:20px 16px 40px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:20px}
+h1{font-size:1.4rem;margin:0}
+.modes{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.modes button{border:0;background:var(--card);color:var(--fg);padding:8px 14px;cursor:pointer;font-size:.95rem}
+.modes button.on{background:var(--accent);color:#fff}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:18px}
+label{display:block;font-size:.8rem;color:var(--muted);margin:8px 0 3px}
+textarea{width:100%;resize:vertical;font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+.add{margin-top:12px;background:var(--accent);color:#fff;border:0;border-radius:8px;padding:9px 18px;font-size:1rem;cursor:pointer}
+.msg{font-size:.85rem;color:var(--muted);margin-left:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.grp{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.grp h2{font-size:1.05rem;margin:0 0 8px;display:flex;justify-content:space-between;gap:8px}
+.grp ul{list-style:none;margin:0;padding:0}
+.grp li{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px solid var(--line)}
+.grp a{color:var(--accent);text-decoration:none;word-break:break-word}
+.grp a:hover{text-decoration:underline}
+.x{background:none;border:0;color:var(--danger);cursor:pointer;font-size:.85rem;padding:0}
+.empty{color:var(--muted);text-align:center;padding:30px 0}
+.pres .grp{padding:18px}
+.pres .grp h2{font-size:1.25rem}
+.pres .grp li{padding:8px 0;font-size:1.05rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>URL Groups</h1>
+    <div class="modes">
+      <button id="bEdit">Edit</button>
+      <button id="bPres">Presentation</button>
+    </div>
+  </header>
+
+  <div class="box" id="editBox">
+    <label for="t">Title</label>
+    <textarea id="t" rows="1" placeholder="Group title (existing title adds to that group)"></textarea>
+    <label for="l">Links (one per line: name, then URL)</label>
+    <textarea id="l" rows="6" placeholder="Google https://google.com&#10;Wikipedia https://wikipedia.org"></textarea>
+    <button class="add" id="add">Add</button><span class="msg" id="msg"></span>
+  </div>
+
+  <div id="out"></div>
+</div>
+
+<script>
+var KD="urlgroups:data", KM="urlgroups:mode";
+var data=[], mode="edit";
+function load(){
+  try{var d=localStorage.getItem(KD); if(d) data=JSON.parse(d)||[];}catch(e){data=[];}
+  try{var m=localStorage.getItem(KM); if(m==="edit"||m==="pres") mode=m;}catch(e){}
+}
+function save(){try{localStorage.setItem(KD,JSON.stringify(data));}catch(e){}}
+function setMode(m){mode=m;try{localStorage.setItem(KM,m);}catch(e){} render();}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+function fixUrl(u){u=u.trim(); if(!/^[a-z][a-z0-9+.-]*:/i.test(u)) u="https://"+u; return /^(https?|mailto):/i.test(u)?u:"";}
+
+function render(){
+  document.getElementById("bEdit").className=mode==="edit"?"on":"";
+  document.getElementById("bPres").className=mode==="pres"?"on":"";
+  document.getElementById("editBox").style.display=mode==="edit"?"block":"none";
+  var h="";
+  data.forEach(function(g,gi){
+    h+='<div class="grp"><h2><span>'+esc(g.title)+'</span>'+(mode==="edit"?'<button class="x" data-g="'+gi+'">Delete group</button>':'')+'</h2><ul>';
+    g.links.forEach(function(l,li){
+      h+='<li><a href="'+esc(l.url)+'" target="_blank" rel="noopener noreferrer">'+esc(l.name)+'</a>'+(mode==="edit"?'<button class="x" data-g="'+gi+'" data-l="'+li+'">Remove</button>':'')+'</li>';
+    });
+    h+='</ul></div>';
+  });
+  var out=document.getElementById("out");
+  out.className=mode==="pres"?"pres":"";
+  out.innerHTML=h?'<div class="grid">'+h+'</div>':'<div class="empty">No links yet.</div>';
+}
+
+document.getElementById("bEdit").onclick=function(){setMode("edit");};
+document.getElementById("bPres").onclick=function(){setMode("pres");};
+
+function parseLines(txt){
+  var res=[];
+  txt.split(/\r?\n/).forEach(function(line){
+    line=line.trim(); if(!line) return;
+    var m=line.match(/^(.*?)[\s]*(\S+)$/);
+    var url=fixUrl(m[2]); if(!url) return;
+    var name=m[1].replace(/[\s\-|,:;>=]+$/,"").trim();
+    res.push({name:name||url,url:url});
+  });
+  return res;
+}
+document.getElementById("add").onclick=function(){
+  var t=document.getElementById("t"),l=document.getElementById("l"),msg=document.getElementById("msg");
+  var title=t.value.trim(),links=parseLines(l.value);
+  if(!title||!links.length){msg.textContent="Enter a title and at least one line with a URL.";return;}
+  var g=data.filter(function(x){return x.title.toLowerCase()===title.toLowerCase();})[0];
+  if(!g){g={title:title,links:[]};data.push(g);}
+  g.links=g.links.concat(links);
+  save();
+  l.value="";
+  msg.textContent=links.length+' link(s) added to "'+g.title+'".';
+  render();
+};
+
+document.getElementById("out").onclick=function(e){
+  var b=e.target.closest("button.x"); if(!b) return;
+  var gi=+b.getAttribute("data-g"), li=b.getAttribute("data-l");
+  if(li===null){ if(confirm("Delete this group?")) data.splice(gi,1); }
+  else { data[gi].links.splice(+li,1); if(!data[gi].links.length) data.splice(gi,1); }
+  save(); render();
+};
+
+load(); render();
+</script>
+</body>
+</html>
