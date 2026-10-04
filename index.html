@@ -28,7 +28,9 @@ textarea{width:100%;resize:vertical;font:inherit;color:var(--fg);background:var(
 .grp li{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px solid var(--line)}
 .grp a{color:var(--accent);text-decoration:none;word-break:break-word}
 .grp a:hover{text-decoration:underline}
-.x{background:none;border:0;color:var(--danger);cursor:pointer;font-size:.85rem;padding:0}
+.grp .actions{display:flex;gap:8px;margin-top:8px}
+.grp .dlbtn,.grp .x{background:none;border:0;color:var(--danger);cursor:pointer;font-size:.85rem;padding:0;text-decoration:underline}
+.grp .dlbtn:hover,.grp .x:hover{text-decoration:none}
 .empty{color:var(--muted);text-align:center;padding:30px 0}
 .pres .grp{padding:18px}
 .pres .grp h2{font-size:1.25rem}
@@ -68,17 +70,36 @@ function setMode(m){mode=m;try{localStorage.setItem(KM,m);}catch(e){} render();}
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
 function fixUrl(u){u=u.trim(); if(!/^[a-z][a-z0-9+.-]*:/i.test(u)) u="https://"+u; return /^(https?|mailto):/i.test(u)?u:"";}
 
+function downloadUrls(gi){
+  var g=data[gi];
+  if(!g||!g.links.length) return;
+  var content=g.links.map(function(l){return l.url;}).join("\n");
+  var blob=new Blob([content],{type:"text/plain"});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement("a");
+  a.href=url;
+  a.download=g.title.replace(/[^a-z0-9]/gi,"_")+".txt";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function render(){
   document.getElementById("bEdit").className=mode==="edit"?"on":"";
   document.getElementById("bPres").className=mode==="pres"?"on":"";
   document.getElementById("editBox").style.display=mode==="edit"?"block":"none";
   var h="";
   data.forEach(function(g,gi){
-    h+='<div class="grp"><h2><span>'+esc(g.title)+'</span>'+(mode==="edit"?'<button class="x" data-g="'+gi+'">Delete group</button>':'')+'</h2><ul>';
+    var actions='';
+    if(mode==="edit"){
+      actions='<div class="actions"><button class="dlbtn" data-g="'+gi+'">Download URLs (.txt)</button><button class="x" data-g="'+gi+'">Delete group</button></div>';
+    }
+    h+='<div class="grp"><h2><span>'+esc(g.title)+'</span></h2><ul>';
     g.links.forEach(function(l,li){
       h+='<li><a href="'+esc(l.url)+'" target="_blank" rel="noopener noreferrer">'+esc(l.name)+'</a>'+(mode==="edit"?'<button class="x" data-g="'+gi+'" data-l="'+li+'">Remove</button>':'')+'</li>';
     });
-    h+='</ul></div>';
+    h+='</ul>'+actions+'</div>';
   });
   var out=document.getElementById("out");
   out.className=mode==="pres"?"pres":"";
@@ -113,7 +134,13 @@ document.getElementById("add").onclick=function(){
 };
 
 document.getElementById("out").onclick=function(e){
-  var b=e.target.closest("button.x"); if(!b) return;
+  var b=e.target.closest("button.dlbtn"); 
+  if(b){
+    var gi=+b.getAttribute("data-g");
+    downloadUrls(gi);
+    return;
+  }
+  b=e.target.closest("button.x"); if(!b) return;
   var gi=+b.getAttribute("data-g"), li=b.getAttribute("data-l");
   if(li===null){ if(confirm("Delete this group?")) data.splice(gi,1); }
   else { data[gi].links.splice(+li,1); if(!data[gi].links.length) data.splice(gi,1); }
