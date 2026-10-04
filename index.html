@@ -28,9 +28,10 @@ textarea{width:100%;resize:vertical;font:inherit;color:var(--fg);background:var(
 .grp li{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-top:1px solid var(--line)}
 .grp a{color:var(--accent);text-decoration:none;word-break:break-word}
 .grp a:hover{text-decoration:underline}
-.grp .actions{display:flex;gap:8px;margin-top:8px}
-.grp .dlbtn,.grp .x{background:none;border:0;color:var(--danger);cursor:pointer;font-size:.85rem;padding:0;text-decoration:underline}
-.grp .dlbtn:hover,.grp .x:hover{text-decoration:none}
+.grp .footer{display:flex;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.grp .dlbtn{background:var(--accent);color:#fff;padding:6px 12px;border-radius:6px;font-size:.85rem;text-decoration:none}
+.grp .dlbtn:hover{opacity:0.9}
+.grp .x{background:none;border:0;color:var(--danger);cursor:pointer;font-size:.85rem;padding:0}
 .empty{color:var(--muted);text-align:center;padding:30px 0}
 .pres .grp{padding:18px}
 .pres .grp h2{font-size:1.25rem}
@@ -61,14 +62,23 @@ textarea{width:100%;resize:vertical;font:inherit;color:var(--fg);background:var(
 <script>
 var KD="urlgroups:data", KM="urlgroups:mode";
 var data=[], mode="edit";
+
 function load(){
   try{var d=localStorage.getItem(KD); if(d) data=JSON.parse(d)||[];}catch(e){data=[];}
   try{var m=localStorage.getItem(KM); if(m==="edit"||m==="pres") mode=m;}catch(e){}
 }
+
 function save(){try{localStorage.setItem(KD,JSON.stringify(data));}catch(e){}}
+
 function setMode(m){mode=m;try{localStorage.setItem(KM,m);}catch(e){} render();}
+
 function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
-function fixUrl(u){u=u.trim(); if(!/^[a-z][a-z0-9+.-]*:/i.test(u)) u="https://"+u; return /^(https?|mailto):/i.test(u)?u:"";}
+
+function fixUrl(u){
+  u=u.trim(); 
+  if(!/^[a-z][a-z0-9+.-]*:/i.test(u)) u="https://"+u; 
+  return /^(https?|mailto):/i.test(u)?u:"";
+}
 
 function downloadUrls(gi){
   var g=data[gi];
@@ -78,7 +88,7 @@ function downloadUrls(gi){
   var url=URL.createObjectURL(blob);
   var a=document.createElement("a");
   a.href=url;
-  a.download=g.title.replace(/[^a-z0-9]/gi,"_")+".txt";
+  a.download=g.title.replace(/[^a-z0-9]/gi,"_").toLowerCase()+".txt";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -89,18 +99,25 @@ function render(){
   document.getElementById("bEdit").className=mode==="edit"?"on":"";
   document.getElementById("bPres").className=mode==="pres"?"on":"";
   document.getElementById("editBox").style.display=mode==="edit"?"block":"none";
+  
   var h="";
   data.forEach(function(g,gi){
-    var actions='';
+    var footer='';
     if(mode==="edit"){
-      actions='<div class="actions"><button class="dlbtn" data-g="'+gi+'">Download URLs (.txt)</button><button class="x" data-g="'+gi+'">Delete group</button></div>';
+      footer='<div class="footer"><button class="dlbtn" data-gi="'+gi+'" onclick="downloadUrls('+gi+')">Download URLs (.txt)</button><button class="x" data-g="'+gi+'" data-li="">Delete group</button></div>';
     }
+    
     h+='<div class="grp"><h2><span>'+esc(g.title)+'</span></h2><ul>';
     g.links.forEach(function(l,li){
-      h+='<li><a href="'+esc(l.url)+'" target="_blank" rel="noopener noreferrer">'+esc(l.name)+'</a>'+(mode==="edit"?'<button class="x" data-g="'+gi+'" data-l="'+li+'">Remove</button>':'')+'</li>';
+      h+='<li><a href="'+esc(l.url)+'" target="_blank" rel="noopener noreferrer">'+esc(l.name)+'</a>';
+      if(mode==="edit"){
+        h+='<button class="x" data-g="'+gi+'" data-l="'+li+'">Remove</button>';
+      }
+      h+='</li>';
     });
-    h+='</ul>'+actions+'</div>';
+    h+='</ul>'+footer+'</div>';
   });
+  
   var out=document.getElementById("out");
   out.className=mode==="pres"?"pres":"";
   out.innerHTML=h?'<div class="grid">'+h+'</div>':'<div class="empty">No links yet.</div>';
@@ -112,14 +129,19 @@ document.getElementById("bPres").onclick=function(){setMode("pres");};
 function parseLines(txt){
   var res=[];
   txt.split(/\r?\n/).forEach(function(line){
-    line=line.trim(); if(!line) return;
-    var m=line.match(/^(.*?)[\s]*(\S+)$/);
-    var url=fixUrl(m[2]); if(!url) return;
-    var name=m[1].replace(/[\s\-|,:;>=]+$/,"").trim();
+    line=line.trim(); 
+    if(!line) return;
+    var idx=line.lastIndexOf(' ');
+    if(idx === -1) return;
+    var name=line.substring(0,idx).trim();
+    var urlPart=line.substring(idx+1).trim();
+    var url=fixUrl(urlPart); 
+    if(!url) return;
     res.push({name:name||url,url:url});
   });
   return res;
 }
+
 document.getElementById("add").onclick=function(){
   var t=document.getElementById("t"),l=document.getElementById("l"),msg=document.getElementById("msg");
   var title=t.value.trim(),links=parseLines(l.value);
@@ -134,20 +156,24 @@ document.getElementById("add").onclick=function(){
 };
 
 document.getElementById("out").onclick=function(e){
-  var b=e.target.closest("button.dlbtn"); 
-  if(b){
-    var gi=+b.getAttribute("data-g");
-    downloadUrls(gi);
+  // Handle delete/remove buttons
+  var xBtn=e.target.closest("button.x");
+  if(xBtn){
+    var gi=+xBtn.getAttribute("data-g"), li=xBtn.getAttribute("data-l");
+    if(li==="" || li===null){
+      if(confirm("Delete this group?")) data.splice(gi,1);
+    } else {
+      data[gi].links.splice(+li,1); 
+      if(!data[gi].links.length) data.splice(gi,1);
+    }
+    save(); 
+    render();
     return;
   }
-  b=e.target.closest("button.x"); if(!b) return;
-  var gi=+b.getAttribute("data-g"), li=b.getAttribute("data-l");
-  if(li===null){ if(confirm("Delete this group?")) data.splice(gi,1); }
-  else { data[gi].links.splice(+li,1); if(!data[gi].links.length) data.splice(gi,1); }
-  save(); render();
 };
 
-load(); render();
+load(); 
+render();
 </script>
 </body>
 </html>
